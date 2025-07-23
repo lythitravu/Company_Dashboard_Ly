@@ -9,6 +9,7 @@ from utils.utils import get_data_path
 from datetime import datetime
 
 #%% Data preparation
+@st.cache_data
 def load_data():
     df = pd.read_csv(get_data_path("FA_processed.csv"))
     val = pd.read_csv(get_data_path("Val_processed.csv"))
@@ -32,7 +33,6 @@ IS_ORDER = [
     "EBIT", "EBIT_Gr", "EBIT_Margin", "EBITDA", "EBITDA_Gr", "EBITDA_Margin",
     "NPATMI", "NPATMI_Gr", "NPAT_Margin"
 ]
-
 
 #%% Financial data table
 def process_section(df_ticker, section, section_name, margin_section=False):
@@ -239,7 +239,7 @@ with col2:
 with col3:
     st.metric("P/B Ratio", f"{key_data['P/B']:,.2f}" if key_data['P/B'] is not None else "N/A")
 with col4:
-    st.metric("EV/EBITDA", f"{key_data['EV/EBITDA']:,.2f}" if key_data['EV/EBITDA'] is not None else "N/A")
+    st.metric("EV/EBITDA", f"{key_data['EV/EBITDA']:,.2f}" if key_data['EV/EBITDA'] is not None else "N/A", border = True)
 # with col5:
 #     # Format the latest TRADE_DATE as 'Mon-Day-Year'
 #     latest_date = pd.to_datetime(val['TRADE_DATE'].max())

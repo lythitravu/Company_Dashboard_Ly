@@ -6,26 +6,37 @@ from plotly.subplots import make_subplots
 from utils.utils import get_data_path
 
 #%% Load bank data
-bank = pd.read_csv(get_data_path("df_q_full.csv"))
-bank_formatted = pd.read_csv(get_data_path("df_q_full_formatted.csv"))
-bank['DATE'] = bank['YEARREPORT'].astype(str) + 'Q' + bank['LENGTHREPORT'].astype(str)
-bank_formatted['DATE'] = bank_formatted['YEARREPORT'].astype(str) + 'Q' + bank_formatted['LENGTHREPORT'].astype(str)
+@st.cache_data
+def load_bank_data():
+    bank = pd.read_csv(get_data_path("df_q_full.csv"))
+    bank_formatted = pd.read_csv(get_data_path("df_q_full_formatted.csv"))
+    bank['DATE'] = bank['YEARREPORT'].astype(str) + 'Q' + bank['LENGTHREPORT'].astype(str)
+    bank_formatted['DATE'] = bank_formatted['YEARREPORT'].astype(str) + 'Q' + bank_formatted['LENGTHREPORT'].astype(str)
+    return bank, bank_formatted
 
-# Load keycode mapping
-mapping = pd.read_excel(get_data_path("IRIS KeyCodes - Bank.xlsx"))
-mapping = mapping[~(mapping['DWHCode'].isna())]
-mapping = mapping[['DWHCode', 'KeyCode','Name','Format']]
+@st.cache_data
+def load_mapping_and_classification():
+    # Load keycode mapping
+    mapping = pd.read_excel(get_data_path("IRIS KeyCodes - Bank.xlsx"))
+    mapping = mapping[~(mapping['DWHCode'].isna())]
+    mapping = mapping[['DWHCode', 'KeyCode','Name','Format']]
 
-ca_format = mapping[mapping['KeyCode'].str.startswith('CA.')][['KeyCode','Format']]
-ca_pct = ca_format[ca_format['Format'] == 'pct']['KeyCode'].tolist()
+    ca_format = mapping[mapping['KeyCode'].str.startswith('CA.')][['KeyCode','Format']]
+    ca_pct = ca_format[ca_format['Format'] == 'pct']['KeyCode'].tolist()
 
-keycode_to_name_dict = mapping.set_index('KeyCode')['Name'].to_dict()
-keycode_to_name_dict.pop("Dividend") # Remove Dividend as it is not used in the dashboard
-name_to_keycode_dict = {v: k for k, v in keycode_to_name_dict.items()}
+    keycode_to_name_dict = mapping.set_index('KeyCode')['Name'].to_dict()
+    keycode_to_name_dict.pop("Dividend") # Remove Dividend as it is not used in the dashboard
+    name_to_keycode_dict = {v: k for k, v in keycode_to_name_dict.items()}
 
-# Load ticker classification
-classification = pd.read_excel(get_data_path("Classification.xlsx"))
-classification['GROUP'] = classification['GROUP'].astype(str)
+    # Load ticker classification
+    classification = pd.read_excel(get_data_path("Classification.xlsx"))
+    classification['GROUP'] = classification['GROUP'].astype(str)
+    
+    return ca_pct, keycode_to_name_dict, name_to_keycode_dict, classification
+
+# Load cached data
+bank, bank_formatted = load_bank_data()
+ca_pct, keycode_to_name_dict, name_to_keycode_dict, classification = load_mapping_and_classification()
 
 #%% Functions for single bank data table
 def single_ticker(df, ticker):

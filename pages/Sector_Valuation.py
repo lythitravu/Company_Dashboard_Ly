@@ -6,12 +6,9 @@ import plotly.express as px
 from utils.utils import get_data_path
 
 #%% Data preparation
-# Import all L2
-def sector_ticker_list():
-    """
-    Return the L2 sectors and the tickers belong to that sector
-    Format: Sector: [Ticker1, Ticker2]
-    """
+@st.cache_data
+def load_sector_data():
+    # Import all L2
     stock_set = pd.read_excel(get_data_path("STOCK LIST.xlsx"))
     # Initialize an empty dictionary to store the classification.
     sector_dict = {}
@@ -25,12 +22,14 @@ def sector_ticker_list():
     
     return sector_dict
 
-sector_dict = sector_ticker_list()
+@st.cache_data
+def load_valuation_data():
+    df = pd.read_csv(get_data_path("Val_processed.csv"))
+    df['TRADE_DATE'] = pd.to_datetime(df['TRADE_DATE'])
+    return df
 
-# Valuation data
-df = pd.read_csv(get_data_path("Val_processed.csv"))
-df['TRADE_DATE'] = pd.to_datetime(df['TRADE_DATE'])
-
+sector_dict = load_sector_data()
+df = load_valuation_data()
 
 #%% Plotly scatter chart for either P/E, P/B, EV/EBITDA for stocks within each L2
 
