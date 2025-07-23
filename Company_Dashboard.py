@@ -1,5 +1,6 @@
 #%%
 import streamlit as st
+import plotly
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -65,24 +66,6 @@ def create_fs_table_main(df, ticker: str) -> pd.DataFrame:
     fs_table = fs_table.drop(columns='SECTION')
     fs_table = fs_table.reindex(index=IS_ORDER)
     return fs_table
-
-def create_bs_table(df, ticker: str) -> pd.DataFrame:
-    df_temp = df.copy()
-    df_ticker = df_temp[df_temp['TICKER'] == ticker]
-    df_section = df_ticker[df_ticker['KEYCODE'].isin(BS)]
-    section_table = df_section.pivot(index='KEYCODE', columns='DATE', values='VALUE')
-    section_table = section_table.reindex(BS)
-    section_table = section_table.map(lambda x: f"{x/1e9:,.1f}")
-    return section_table
-
-def create_cf_table(df, ticker: str) -> pd.DataFrame:
-    df_temp = df.copy()
-    df_ticker = df_temp[df_temp['TICKER'] == ticker]
-    df_section = df_ticker[df_ticker['KEYCODE'].isin(CF)]
-    section_table = df_section.pivot(index='KEYCODE', columns='DATE', values='VALUE')
-    section_table = section_table.reindex(CF)
-    section_table = section_table.map(lambda x: f"{x/1e9:,.1f}")
-    return section_table
 
 #%% Plotting key FA data
 def create_subplot_figure(df_ticker, plot_cols, ma, subplot_titles, yaxis_suffix, title, rows, colors):
@@ -250,13 +233,13 @@ st.write(f"Data last updated: {formatted_date} (except for price chart - daily u
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Market Cap", f"{key_data['M_CAP']:,.0f}" if key_data['M_CAP'] is not None else "N/A", border = True)
+    st.metric("Market Cap", f"{key_data['M_CAP']:,.0f}" if key_data['M_CAP'] is not None else "N/A")
 with col2:
-    st.metric("P/E Ratio", f"{key_data['P/E']:,.2f}" if key_data['P/E'] is not None else "N/A", border = True)
+    st.metric("P/E Ratio", f"{key_data['P/E']:,.2f}" if key_data['P/E'] is not None else "N/A")
 with col3:
-    st.metric("P/B Ratio", f"{key_data['P/B']:,.2f}" if key_data['P/B'] is not None else "N/A", border = True)
+    st.metric("P/B Ratio", f"{key_data['P/B']:,.2f}" if key_data['P/B'] is not None else "N/A")
 with col4:
-    st.metric("EV/EBITDA", f"{key_data['EV/EBITDA']:,.2f}" if key_data['EV/EBITDA'] is not None else "N/A", border = True)
+    st.metric("EV/EBITDA", f"{key_data['EV/EBITDA']:,.2f}" if key_data['EV/EBITDA'] is not None else "N/A")
 # with col5:
 #     # Format the latest TRADE_DATE as 'Mon-Day-Year'
 #     latest_date = pd.to_datetime(val['TRADE_DATE'].max())
@@ -301,8 +284,8 @@ with st.expander("Valuation Charts", expanded=False):
 
 # Financial Tables:
 fs_table_result = create_fs_table_main(df, selected_ticker)
-bs_table_result = create_bs_table(df, selected_ticker)
-cf_table_result = create_cf_table(df, selected_ticker)
+bs_table_result = process_section(df[df['TICKER'] == selected_ticker], BS, 'BS')
+cf_table_result = process_section(df[df['TICKER'] == selected_ticker], CF, 'CF')
 
 with st.expander("Financial Tables", expanded=False):
     tab1, tab2, tab3 = st.tabs(["Financial Summary", "Balance Sheet", "Cash Flow"])
