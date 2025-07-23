@@ -11,12 +11,22 @@ def load_earnings_data():
     df = pd.read_csv(get_data_path("FA_processed.csv"))
     return df
 
-def create_earnings_summary(df, target_period='2025Q2', metric='NPATMI'):
+@st.cache_data
+def load_market_cap_data():
+    df = pd.read_csv(get_data_path("MktCap_processed.csv"))
+    return df
+
+def create_earnings_summary(df, mktcap_df, target_period='2025Q2', metric='NPATMI', min_market_cap=500):
     """
-    Create earnings summary table for tickers with data in target period
+    Create earnings summary table for tickers with data in target period and market cap above threshold
     """
-    # Filter for metric data in target period
-    target_data = df[(df['DATE'] == target_period) & (df['KEYCODE'] == metric)].copy()
+    # Filter tickers by market cap
+    large_cap_tickers = mktcap_df[mktcap_df['CUR_MKT_CAP'] >= min_market_cap]['TICKER'].unique()
+    
+    # Filter for metric data in target period for large cap tickers only
+    target_data = df[(df['DATE'] == target_period) & 
+                    (df['KEYCODE'] == metric) & 
+                    (df['TICKER'].isin(large_cap_tickers))].copy()
     
     if target_data.empty:
         return pd.DataFrame()
@@ -37,23 +47,27 @@ def create_earnings_summary(df, target_period='2025Q2', metric='NPATMI'):
     # Filter for target period only
     target_summary = metric_data[metric_data['DATE'] == target_period].copy()
     
-    # Create summary table
-    summary_table = target_summary[['TICKER', 'VALUE', 'YoY_Growth', 'QoQ_Growth']].copy()
-    summary_table.columns = ['TICKER', f'{target_period} {metric} (VND)', 'YoY Growth (%)', 'QoQ Growth (%)']
-    
-    # Format values
-    summary_table[f'{target_period} {metric} (VND)'] = summary_table[f'{target_period} {metric} (VND)'].apply(
-        lambda x: f"{x/1e9:,.1f}B" if pd.notnull(x) else "N/A"
-    )
-    summary_table['YoY Growth (%)'] = summary_table['YoY Growth (%)'].apply(
-        lambda x: f"{x*100:.1f}%" if pd.notnull(x) else "N/A"
-    )
-    summary_table['QoQ Growth (%)'] = summary_table['QoQ Growth (%)'].apply(
-        lambda x: f"{x*100:.1f}%" if pd.notnull(x) else "N/A"
+    # Add market cap data
+    target_summary = target_summary.merge(
+        mktcap_df[['TICKER', 'CUR_MKT_CAP']], 
+        on='TICKER', 
+        how='left'
     )
     
-    # Sort by the VALUE column (which is now formatted)
-    return summary_table.sort_values('TICKER').reset_index(drop=True)
+    # Create summary table with numeric values for sorting
+    summary_table = target_summary[['TICKER', 'VALUE', 'YoY_Growth', 'QoQ_Growth', 'CUR_MKT_CAP']].copy()
+    
+    # Convert to appropriate units but keep as numbers for sorting
+    summary_table['VALUE_BILLIONS'] = summary_table['VALUE'] / 1e9  # Convert to billions
+    summary_table['YoY_Growth_Pct'] = summary_table['YoY_Growth'] * 100  # Convert to percentage
+    summary_table['QoQ_Growth_Pct'] = summary_table['QoQ_Growth'] * 100  # Convert to percentage
+    
+    # Select and rename columns for display
+    final_table = summary_table[['TICKER', 'VALUE_BILLIONS', 'YoY_Growth_Pct', 'QoQ_Growth_Pct', 'CUR_MKT_CAP']].copy()
+    final_table.columns = ['TICKER', f'{target_period} {metric} (Billions VND)', 'YoY Growth (%)', 'QoQ Growth (%)', 'Market Cap (Billions VND)']
+    
+    # Sort by market cap descending and reset index
+    return final_table.sort_values('Market Cap (Billions VND)', ascending=False).reset_index(drop=True)
 
 #%% Streamlit App
 st.set_page_config(layout='wide', page_title="Earnings Summary")
@@ -62,27 +76,28 @@ st.title("Earnings Summary - Q2 2025")
 
 # Load data
 df = load_earnings_data()
+mktcap_df = load_market_cap_data()
 
-# Metric selection buttons - use smaller columns to reduce gaps
-col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 2, 2])
-with col1:
-    if st.button("NPATMI", type="primary"):
-        st.session_state.selected_metric = "NPATMI"
-with col2:
-    if st.button("EBIT"):
-        st.session_state.selected_metric = "EBIT"
-with col3:
-    if st.button("Net Revenue"):
-        st.session_state.selected_metric = "Net_Revenue"
+# Market cap filter input
+st.subheader("Filter Settings")
+min_market_cap = st.number_input(
+    "Minimum Market Cap (Billion VND)", 
+    min_value=0, 
+    value=500, 
+    step=1,
+    help="Filter companies by minimum market cap in billions VND"
+)
 
-# Initialize session state
-if 'selected_metric' not in st.session_state:
-    st.session_state.selected_metric = "NPATMI"
-
-selected_metric = st.session_state.selected_metric
+# Metric selection dropdown
+selected_metric = st.selectbox(
+    "Select Metric",
+    options=["NPATMI", "EBIT", "Net_Revenue"],
+    index=0,
+    help="Choose the financial metric to display"
+)
 
 # Create earnings summary
-earnings_summary = create_earnings_summary(df, '2025Q2', selected_metric)
+earnings_summary = create_earnings_summary(df, mktcap_df, '2025Q2', selected_metric, min_market_cap)
 
 if earnings_summary.empty:
     st.warning(f"No {selected_metric} data found for Q2 2025")
