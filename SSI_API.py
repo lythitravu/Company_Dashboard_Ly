@@ -9,7 +9,7 @@ import streamlit as st
 
 
 #%% Helper functions
-def fetch_historical_price(ticker: str) -> pd.DataFrame:
+def fetch_historical_price(ticker: str, start_date: str = None) -> pd.DataFrame:
     """Fetch stock historical price and volume data from TCBS API"""
     
     # TCBS API endpoint for historical data
