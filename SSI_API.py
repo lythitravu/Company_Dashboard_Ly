@@ -15,12 +15,14 @@ def fetch_historical_price(ticker: str) -> pd.DataFrame:
     # TCBS API endpoint for historical data
     url = "https://apipubaws.tcbs.com.vn/stock-insight/v1/stock/bars-long-term"
     
-    # Parameters for HPG stock - get more data for better visualization
+    # Convert start_date string to timestamp if provided
+    start_timestamp = str(int(datetime.strptime(start_date, "%Y-%m-%d").timestamp()))
+    # Parameters for stock data
     params = {
         "ticker": ticker,
         "type": "stock",
         "resolution": "D",  # Daily data
-        "from": "0",
+        "from": start_timestamp,
         "to": str(int(datetime.now().timestamp()))
     }
     
@@ -120,7 +122,7 @@ def load_ticker_price(ticker, start_date):
     """
     Load OHLCV data for a specific ticker.
     """
-    df = fetch_historical_price(ticker)
+    df = fetch_historical_price(ticker, start_date)
     fig = plot_ohlcv_candlestick(df, ticker, start_date)
     return fig
 
