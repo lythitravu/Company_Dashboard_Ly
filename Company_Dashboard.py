@@ -256,14 +256,14 @@ fig_GR = create_gr_plots(df, selected_ticker)
 fig_MARGIN = create_margin_plots(df, selected_ticker)
 fig_BANK_SUPPLEMENT = create_bank_plots(bank, selected_ticker)
 
-# # Plot OHLCV data
-# from SSI_API import load_ticker_price
-# ytd = datetime(datetime.today().year, 1, 1)
+# Plot OHLCV data
+from SSI_API import load_ticker_price
+ytd = datetime(datetime.today().year, 1, 1)
 
-# with st.expander("Price Chart", expanded=True):
-#     start_date_price = st.date_input("Start Date (Default: YTD)", value=ytd, key ="start_date_price")
-#     fig_PRICE = load_ticker_price(selected_ticker, start_date=start_date_price.strftime('%Y-%m-%d'))
-#     st.plotly_chart(fig_PRICE)
+with st.expander("Price Chart", expanded=True):
+    start_date_price = st.date_input("Start Date (Default: YTD)", value=ytd, key ="start_date_price")
+    fig_PRICE = load_ticker_price(selected_ticker, start_date=start_date_price.strftime('%Y-%m-%d'))
+    st.plotly_chart(fig_PRICE)
 
 # Tab for 3 financial graphs
 with st.expander("Financial Graphs", expanded=True):

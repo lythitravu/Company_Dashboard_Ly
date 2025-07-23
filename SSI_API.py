@@ -9,56 +9,59 @@ import streamlit as st
 
 
 #%% Helper functions
-def get_unix_timestamp(date_str):
-    # Input format: 'YYYY-MM-DD'
-    return int(time.mktime(datetime.strptime(date_str, "%Y-%m-%d").timetuple()))
-
-@st.cache_data
-def fetch_ohlcv(symbol, start_date="2020-01-01", end_date=None):
-    if end_date is None:
-        end_date = datetime.today().strftime('%Y-%m-%d')
-    from_unix = get_unix_timestamp(start_date)
-    to_unix = get_unix_timestamp(end_date)
-
-    url = (
-        f"https://iboard-api.ssi.com.vn/statistics/charts/history"
-        f"?resolution=1D&symbol={symbol}&from={from_unix}&to={to_unix}"
-    )
-
-    resp = requests.get(url)
-    resp.raise_for_status()
-    data = resp.json()
-
-    # Safety checks
-    if data['code'] != "SUCCESS":
-        raise Exception("API returned error: " + str(data))
-
-    # Extract OHLCV and time
-    d = data["data"]
-    # Ensure d['t'] is not empty and is a list of timestamps
-    if not d['t']:
-        raise Exception("No data returned from API for the given date range.")
-
-    # # Convert to Vietnam time (GMT+7)
-    date_series = pd.to_datetime(d['t'], unit='s')
-    # # If you want naive datetime (no tz info), uncomment the next line:
-    # date_series = date_series.tz_localize(None)
-
-    df = pd.DataFrame({
-        'date': date_series,
-        'open': d['o'],
-        'high': d['h'],
-        'low': d['l'],
-        'close': d['c'],
-        'volume': d['v']
-    })
-
-    return df
-
+def fetch_historical_price(ticker: str) -> pd.DataFrame:
+    """Fetch stock historical price and volume data from TCBS API"""
+    
+    # TCBS API endpoint for historical data
+    url = "https://apipubaws.tcbs.com.vn/stock-insight/v1/stock/bars-long-term"
+    
+    # Parameters for HPG stock - get more data for better visualization
+    params = {
+        "ticker": ticker,
+        "type": "stock",
+        "resolution": "D",  # Daily data
+        "from": "0",
+        "to": str(int(datetime.now().timestamp()))
+    }
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json"
+    }
+    
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        
+        if 'data' in data:
+            # Convert to DataFrame for easier manipulation
+            df = pd.DataFrame(data['data'])
+            
+            # Convert timestamp to datetime
+            if 'tradingDate' in df.columns:
+                # Check if tradingDate is already in ISO format
+                if df['tradingDate'].dtype == 'object' and df['tradingDate'].str.contains('T').any():
+                    df['tradingDate'] = pd.to_datetime(df['tradingDate'])
+                else:
+                    df['tradingDate'] = pd.to_datetime(df['tradingDate'], unit='ms')
+            
+            # Select relevant columns
+            columns_to_keep = ['tradingDate', 'open', 'high', 'low', 'close', 'volume']
+            df = df[[col for col in columns_to_keep if col in df.columns]]
+            
+            return df
+        else:
+            print("No data found in response")
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data: {e}")
+        return None
 
 def plot_ohlcv_candlestick(df, symbol, start_date = '2024-12-31'):
-    df_temp = df[df['date'] >= start_date].copy()
-    df_temp['date'] = df_temp['date'].dt.strftime('%Y-%m-%d')
+    df_temp = df[df['tradingDate'] >= start_date].copy()
+    df_temp['tradingDate'] = df_temp['tradingDate'].dt.strftime('%Y-%m-%d')
     fig = make_subplots(
         rows=2, cols=1, 
         shared_xaxes=True, 
@@ -66,10 +69,11 @@ def plot_ohlcv_candlestick(df, symbol, start_date = '2024-12-31'):
         row_heights=[0.7, 0.3],
         subplot_titles=[f"{symbol} Price Chart", "Volume"]
     )
+
     # Candlestick
     fig.add_trace(
         go.Candlestick(
-            x=df_temp['date'],
+            x=df_temp['tradingDate'],
             open=df_temp['open'],
             high=df_temp['high'],
             low=df_temp['low'],
@@ -82,11 +86,11 @@ def plot_ohlcv_candlestick(df, symbol, start_date = '2024-12-31'):
     colors = ['green' if c >= o else 'red' for c, o in zip(df_temp['close'], df_temp['open'])]
     fig.add_trace(
         go.Bar(
-            x=df_temp['date'],
+            x=df_temp['tradingDate'],
             y=df_temp['volume'],
             marker_color=colors,
             name='Volume',
-            opacity=0.5
+            opacity=0.8
         ), row=2, col=1
     )
     # Layout
@@ -106,20 +110,17 @@ def plot_ohlcv_candlestick(df, symbol, start_date = '2024-12-31'):
         type='category',
     )
 
-    return fig
+    return fig 
 
 #%% Putting it together
 ytd = datetime(datetime.today().year, 1, 1)
-two_years_ago = datetime.today() - pd.DateOffset(years=2)
-three_years_ago = datetime.today() - pd.DateOffset(years=3)
-five_years_ago = datetime.today() - pd.DateOffset(years=5)
 
 @st.cache_data
-def load_ticker_price(ticker, start_date, end_date=None):
+def load_ticker_price(ticker, start_date):
     """
     Load OHLCV data for a specific ticker.
     """
-    df = fetch_ohlcv(ticker, start_date, end_date)
+    df = fetch_historical_price(ticker)
     fig = plot_ohlcv_candlestick(df, ticker, start_date)
     return fig
 
