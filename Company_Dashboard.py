@@ -135,6 +135,12 @@ def create_bank_plots(df, ticker: str):
     df_temp = df.copy()
     df_ticker = df_temp[df_temp.TICKER == ticker]
     plot_cols = [col for col in ['PPOP', 'Provision for credit losses', 'COF from loan' , 'Loan yield', 'NIM', 'NPL (3-5)'] if col in df_ticker.columns]
+
+    # Convert columns to numeric, handling non-numeric values
+    for col in plot_cols:
+        if col in df_ticker.columns:
+            df_ticker[col] = pd.to_numeric(df_ticker[col], errors='coerce')
+
     for col in ['NIM','Loan yield', 'NPL (3-5)','COF from loan']:
         if col in df_ticker.columns:
             df_ticker[col] = df_ticker[col] * 100
